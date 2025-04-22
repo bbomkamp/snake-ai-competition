@@ -69,9 +69,9 @@ def draw_food(food_position):
     pygame.draw.rect(screen, RED, pygame.Rect(food_position[0], food_position[1], BLOCK_SIZE, BLOCK_SIZE))
 
 
-def display_score(score1, score2):
+def display_score(green_score, blue_score):
     """Display the current scores on the screen."""
-    score_text = font.render(f"Snake 1: {score1}  Snake 2: {score2}", True, WHITE)
+    score_text = font.render(f"Green: {green_score}  Blue: {blue_score}", True, WHITE)
     screen.blit(score_text, [10, 10])
 
 
@@ -214,18 +214,18 @@ def menu():
 
 def main(single_snake):
     # Initial snake setups
-    snake1 = Snake([[100, 100], [80, 100], [60, 100]], "RIGHT", GREEN)  # Snake 1
+    snake1 = Snake([[100, 100], [80, 100], [60, 100]], "RIGHT", GREEN)  # Green Snake
     snake2 = None
     if not single_snake:
-        snake2 = Snake([[700, 500], [720, 500], [740, 500]], "LEFT", BLUE)  # Snake 2
+        snake2 = Snake([[700, 500], [720, 500], [740, 500]], "LEFT", BLUE)  # Blue Snake
 
     # Initial food position
     food_position = spawn_food_with_safe_zone(snake1.body, snake2.body if snake2 else [])
     food_spawn = True
 
     # Initial scores
-    score1 = 0
-    score2 = 0
+    green_score = 0  # Green Snake's score
+    blue_score = 0  # Blue Snake's score
 
     # Main game loop
     while True:
@@ -234,30 +234,30 @@ def main(single_snake):
                 pygame.quit()
                 sys.exit()
 
-        # AI logic for Snake 1
+        # AI logic for Green Snake
         snake1.direction = ai_move(snake1.body, food_position, snake1.direction, snake2.body if snake2 else [])
 
-        # AI logic for Snake 2 (if it exists)
+        # AI logic for Blue Snake (if it exists)
         if snake2:
             snake2.direction = ai_move(snake2.body, food_position, snake2.direction, snake1.body)
 
-        # Move Snake 1
+        # Move Green Snake
         snake1.move()
 
-        # Move Snake 2 (if it exists)
+        # Move Blue Snake (if it exists)
         if snake2:
             snake2.move()
 
-        # Check if Snake 1 eats the food
+        # Check if Green Snake eats the food
         if snake1.body[0][0] == food_position[0] and snake1.body[0][1] == food_position[1]:
-            score1 += 1
+            green_score += 1
             food_spawn = False
         else:
             snake1.shrink()
 
-        # Check if Snake 2 eats the food (if it exists)
+        # Check if Blue Snake eats the food (if it exists)
         if snake2 and snake2.body[0][0] == food_position[0] and snake2.body[0][1] == food_position[1]:
-            score2 += 1
+            blue_score += 1
             food_spawn = False
         elif snake2:
             snake2.shrink()
@@ -268,48 +268,70 @@ def main(single_snake):
             food_spawn = True
 
         # Check for collisions
-        # Wall collision for Snake 1
+        # Wall collision for Green Snake
         if (snake1.body[0][0] < 0 or snake1.body[0][0] >= SCREEN_WIDTH or
                 snake1.body[0][1] < 0 or snake1.body[0][1] >= SCREEN_HEIGHT):
             if snake2:
-                print("Snake 2 Wins!")
+                display_result("Blue Wins!", green_score, blue_score)
             else:
-                print("Game Over!")
+                display_result("Game Over!", green_score, blue_score)
             return  # Return to menu
 
-        # Wall collision for Snake 2 (if it exists)
+        # Wall collision for Blue Snake (if it exists)
         if snake2 and (snake2.body[0][0] < 0 or snake2.body[0][0] >= SCREEN_WIDTH or
                        snake2.body[0][1] < 0 or snake2.body[0][1] >= SCREEN_HEIGHT):
-            print("Snake 1 Wins!")
+            display_result("Green Wins!", green_score, blue_score)
             return  # Return to menu
 
-        # Self-collision for Snake 1
+        # Self-collision for Green Snake
         for segment in snake1.body[1:]:
-            if snake1.body[0] == segment:
+            if snake1.body[0] == segment:  # Green collides with itself
                 if snake2:
-                    print("Snake 2 Wins!")
+                    if green_score > blue_score:
+                        display_result("Green Wins!", green_score, blue_score)
+                    elif blue_score > green_score:
+                        display_result("Blue Wins!", green_score, blue_score)
+                    else:
+                        display_result("It's a draw!", green_score, blue_score)
                 else:
-                    print("Game Over!")
+                    display_result("Game Over!", green_score, blue_score)
                 return  # Return to menu
 
-        # Self-collision for Snake 2 (if it exists)
+        # Self-collision for Blue Snake (if it exists)
         if snake2:
             for segment in snake2.body[1:]:
-                if snake2.body[0] == segment:
-                    print("Snake 1 Wins!")
+                if snake2.body[0] == segment:  # Blue collides with itself
+                    if green_score > blue_score:
+                        display_result("Green Wins!", green_score, blue_score)
+                    elif blue_score > green_score:
+                        display_result("Blue Wins!", green_score, blue_score)
+                    else:
+                        display_result("It's a draw!", green_score, blue_score)
                     return  # Return to menu
 
-        # Collision between Snake 1 and Snake 2 (if both exist)
+        # Collision between Green and Blue (if both exist)
         if snake2:
+            # Check if Green collides with Blue
             for segment in snake2.body:
-                if snake1.body[0] == segment:
-                    print("Collision! It's a draw!")
-                    return  # Return to menu
+                if snake1.body[0] == segment:  # Green collides with Blue
+                    if green_score > blue_score:
+                        display_result("Green Wins!", green_score, blue_score)
+                    elif blue_score > green_score:
+                        display_result("Blue Wins!", green_score, blue_score)
+                    else:
+                        display_result("It's a draw!", green_score, blue_score)
+                    return  # End the game
 
+            # Check if Blue collides with Green
             for segment in snake1.body:
-                if snake2.body[0] == segment:
-                    print("Snake 1 Wins!")
-                    return  # Return to menu
+                if snake2.body[0] == segment:  # Blue collides with Green
+                    if green_score > blue_score:
+                        display_result("Green Wins!", green_score, blue_score)
+                    elif blue_score > green_score:
+                        display_result("Blue Wins!", green_score, blue_score)
+                    else:
+                        display_result("It's a draw!", green_score, blue_score)
+                    return  # End the game
 
         # Clear the screen
         screen.fill(BLACK)
@@ -322,15 +344,44 @@ def main(single_snake):
 
         # Display the scores
         if snake2:
-            display_score(score1, score2)
+            display_score(green_score, blue_score)
         else:
-            display_score(score1, 0)
+            display_score(green_score, 0)
 
         # Update the display
         pygame.display.flip()
 
         # Control the frame rate
-        clock.tick(36)  # Increase frame rate to 20 FPS
+        clock.tick(36)  # Increase frame rate FPS
+
+
+def display_result(result_text, green_score, blue_score):
+    """Display the result of the game on the screen along with the scores."""
+    screen.fill(BLACK)  # Clear the screen
+    result_font = pygame.font.SysFont("arial", 50)  # Larger font for the result
+    result_surface = result_font.render(result_text, True, WHITE)
+    screen.blit(result_surface, [SCREEN_WIDTH // 2 - result_surface.get_width() // 2, SCREEN_HEIGHT // 2 - 100])
+
+    # Display the scores
+    score_font = pygame.font.SysFont("arial", 40)
+    score_surface = score_font.render(f"Green: {green_score}  Blue: {blue_score}", True, WHITE)
+    screen.blit(score_surface, [SCREEN_WIDTH // 2 - score_surface.get_width() // 2, SCREEN_HEIGHT // 2 - 30])
+
+    # Display instructions to return to the menu
+    instruction_font = pygame.font.SysFont("arial", 25)
+    instruction_surface = instruction_font.render("Press any key to return to the menu", True, WHITE)
+    screen.blit(instruction_surface, [SCREEN_WIDTH // 2 - instruction_surface.get_width() // 2, SCREEN_HEIGHT // 2 + 50])
+
+    pygame.display.flip()  # Update the display
+
+    # Wait for the user to press a key
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                return  # Return to the menu
 
 
 if __name__ == "__main__":
