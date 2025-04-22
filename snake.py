@@ -57,6 +57,14 @@ class Snake:
         for segment in self.body:
             pygame.draw.rect(screen, self.color, pygame.Rect(segment[0], segment[1], BLOCK_SIZE, BLOCK_SIZE))
 
+    def collides_with_self(self):
+        """Check if the snake collides with itself."""
+        return self.body[0] in self.body[1:]
+
+    def collides_with(self, other_snake):
+        """Check if the snake collides with another snake."""
+        return self.body[0] in other_snake.body
+
 
 def draw_snake(snake_body, color):
     """Draw the snake on the screen."""
@@ -76,31 +84,15 @@ def display_score(green_score, blue_score):
 
 
 def ai_move(snake_body, food_position, direction, other_snake_body):
-    """Improved AI logic to prioritize avoiding collisions over eating food."""
-    head_x, head_y = snake_body[0]
-    food_x, food_y = food_position
-
-    # Possible moves
-    moves = get_possible_moves(head_x, head_y)
-
-    # Filter valid moves
-    valid_moves = get_valid_moves(moves, snake_body, other_snake_body)
+    """Calculate the next move for the snake."""
+    valid_moves = get_valid_moves(get_possible_moves(*snake_body[0]), snake_body, other_snake_body)
 
     # If no valid moves, continue in the current direction
     if not valid_moves:
         return direction
 
-    # Check if the food is contested
-    contested = food_position in other_snake_body[:3]  # Check if the other snake is close to the food
-    if contested:
-        # Avoid moving directly toward the food if it's contested
-        valid_moves = {move: pos for move, pos in valid_moves.items() if pos != food_position}
-
     # Prioritize food among valid moves
-    best_move = prioritize_food(valid_moves, food_position)
-
-    # If no move toward the food is safe, return any valid move
-    return best_move or direction
+    return prioritize_food(valid_moves, food_position) or direction
 
 
 def get_possible_moves(head_x, head_y):
@@ -115,37 +107,34 @@ def get_possible_moves(head_x, head_y):
 
 def get_valid_moves(moves, snake_body, other_snake_body):
     """Filter out moves that would result in collisions."""
-    valid_moves = {}
-    for move, position in moves.items():
-        if (0 <= position[0] < SCREEN_WIDTH and
-                0 <= position[1] < SCREEN_HEIGHT and
-                position not in snake_body and
-                position not in other_snake_body):
-            valid_moves[move] = position
-    return valid_moves
+    return {
+        move: pos
+        for move, pos in moves.items()
+        if (0 <= pos[0] < SCREEN_WIDTH and
+            0 <= pos[1] < SCREEN_HEIGHT and
+            pos not in snake_body and
+            pos not in other_snake_body)
+    }
 
 
 def prioritize_food(valid_moves, food_position):
     """Choose the move that minimizes the distance to the food."""
-    best_move = None
-    min_distance = float("inf")
-    for move, position in valid_moves.items():
-        distance = abs(position[0] - food_position[0]) + abs(position[1] - food_position[1])  # Manhattan distance
-        if distance < min_distance:
-            min_distance = distance
-            best_move = move
-    return best_move
+    return min(
+        valid_moves,
+        key=lambda move: abs(valid_moves[move][0] - food_position[0]) + abs(valid_moves[move][1] - food_position[1]),
+        default=None,
+    )
 
 
 def flood_fill(snake_body, other_snake_body):
     """Calculate the available space for the snake using flood-fill."""
     visited = set()
-    queue = deque([snake_body[0]])
+    queue = deque([tuple(snake_body[0])])
     space = 0
 
     while queue:
-        x, y = queue.popleft()  # Faster than pop(0)
-        if (x, y) in visited or (x, y) in snake_body or (x, y) in other_snake_body:
+        x, y = queue.popleft()
+        if (x, y) in visited or (x, y) in map(tuple, snake_body) or (x, y) in map(tuple, other_snake_body):
             continue
         if x < 0 or x >= SCREEN_WIDTH or y < 0 or y >= SCREEN_HEIGHT:
             continue
@@ -154,10 +143,7 @@ def flood_fill(snake_body, other_snake_body):
         space += 1
 
         # Add neighboring cells
-        queue.append((x + BLOCK_SIZE, y))
-        queue.append((x - BLOCK_SIZE, y))
-        queue.append((x, y + BLOCK_SIZE))
-        queue.append((x, y - BLOCK_SIZE))
+        queue.extend([(x + BLOCK_SIZE, y), (x - BLOCK_SIZE, y), (x, y + BLOCK_SIZE), (x, y - BLOCK_SIZE)])
 
     return space
 
@@ -268,70 +254,7 @@ def main(single_snake):
             food_spawn = True
 
         # Check for collisions
-        # Wall collision for Green Snake
-        if (snake1.body[0][0] < 0 or snake1.body[0][0] >= SCREEN_WIDTH or
-                snake1.body[0][1] < 0 or snake1.body[0][1] >= SCREEN_HEIGHT):
-            if snake2:
-                display_result("Blue Wins!", green_score, blue_score)
-            else:
-                display_result("Game Over!", green_score, blue_score)
-            return  # Return to menu
-
-        # Wall collision for Blue Snake (if it exists)
-        if snake2 and (snake2.body[0][0] < 0 or snake2.body[0][0] >= SCREEN_WIDTH or
-                       snake2.body[0][1] < 0 or snake2.body[0][1] >= SCREEN_HEIGHT):
-            display_result("Green Wins!", green_score, blue_score)
-            return  # Return to menu
-
-        # Self-collision for Green Snake
-        for segment in snake1.body[1:]:
-            if snake1.body[0] == segment:  # Green collides with itself
-                if snake2:
-                    if green_score > blue_score:
-                        display_result("Green Wins!", green_score, blue_score)
-                    elif blue_score > green_score:
-                        display_result("Blue Wins!", green_score, blue_score)
-                    else:
-                        display_result("It's a draw!", green_score, blue_score)
-                else:
-                    display_result("Game Over!", green_score, blue_score)
-                return  # Return to menu
-
-        # Self-collision for Blue Snake (if it exists)
-        if snake2:
-            for segment in snake2.body[1:]:
-                if snake2.body[0] == segment:  # Blue collides with itself
-                    if green_score > blue_score:
-                        display_result("Green Wins!", green_score, blue_score)
-                    elif blue_score > green_score:
-                        display_result("Blue Wins!", green_score, blue_score)
-                    else:
-                        display_result("It's a draw!", green_score, blue_score)
-                    return  # Return to menu
-
-        # Collision between Green and Blue (if both exist)
-        if snake2:
-            # Check if Green collides with Blue
-            for segment in snake2.body:
-                if snake1.body[0] == segment:  # Green collides with Blue
-                    if green_score > blue_score:
-                        display_result("Green Wins!", green_score, blue_score)
-                    elif blue_score > green_score:
-                        display_result("Blue Wins!", green_score, blue_score)
-                    else:
-                        display_result("It's a draw!", green_score, blue_score)
-                    return  # End the game
-
-            # Check if Blue collides with Green
-            for segment in snake1.body:
-                if snake2.body[0] == segment:  # Blue collides with Green
-                    if green_score > blue_score:
-                        display_result("Green Wins!", green_score, blue_score)
-                    elif blue_score > green_score:
-                        display_result("Blue Wins!", green_score, blue_score)
-                    else:
-                        display_result("It's a draw!", green_score, blue_score)
-                    return  # End the game
+        handle_collisions(snake1, snake2, green_score, blue_score)
 
         # Clear the screen
         screen.fill(BLACK)
@@ -353,6 +276,32 @@ def main(single_snake):
 
         # Control the frame rate
         clock.tick(36)  # Increase frame rate FPS
+
+
+def handle_collisions(snake1, snake2, green_score, blue_score):
+    """Handle all collision scenarios."""
+    # Self-collision for Green Snake
+    if snake1.collides_with_self():
+        end_game(snake2, green_score, blue_score)
+
+    # Self-collision for Blue Snake
+    if snake2 and snake2.collides_with_self():
+        end_game(snake2, green_score, blue_score)
+
+    # Collision between Green and Blue
+    if snake2 and (snake1.collides_with(snake2) or snake2.collides_with(snake1)):
+        end_game(snake2, green_score, blue_score)
+
+
+def end_game(snake2, green_score, blue_score):
+    """Determine the winner and display the result."""
+    if green_score > blue_score:
+        display_result("Green Wins!", green_score, blue_score)
+    elif blue_score > green_score:
+        display_result("Blue Wins!", green_score, blue_score)
+    else:
+        display_result("It's a draw!", green_score, blue_score)
+    sys.exit()
 
 
 def display_result(result_text, green_score, blue_score):
